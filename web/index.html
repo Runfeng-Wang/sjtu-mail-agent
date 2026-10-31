@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>交大邮箱智能助手</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">📮 交大邮箱智能助手</div>
+  <div class="sync">
+    <span id="syncText" class="muted">本地 0 封</span>
+    <button id="syncBtn" class="btn primary">同步邮件</button>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="tabs" id="tabs">
+    <button data-tab="todos" class="active">✅ 待办事项</button>
+    <button data-tab="bills">💰 账单汇总</button>
+    <button data-tab="unreplied">✉️ 未回复</button>
+    <button data-tab="search">🔍 主题检索</button>
+    <button data-tab="settings">⚙️ 设置</button>
+  </nav>
+
+  <main>
+    <!-- 待办 -->
+    <section id="tab-todos" class="tab active">
+      <h2>待办事项 · 是否有遗漏</h2>
+      <div class="toolbar">
+        <label>时间范围 <select id="todoDays"><option>7</option><option>14</option><option selected>30</option><option>60</option><option>90</option></select> 天</label>
+        <label><input type="checkbox" id="todoBulk" checked> 包含通知/群发邮件</label>
+        <button class="btn primary" id="todoRun">开始分析</button>
+      </div>
+      <div id="todoOut"></div>
+    </section>
+
+    <!-- 账单 -->
+    <section id="tab-bills" class="tab">
+      <h2>订阅与账单汇总</h2>
+      <div class="toolbar">
+        <label>时间范围 <select id="billDays"><option>30</option><option>90</option><option selected>180</option><option>365</option></select> 天</label>
+        <button class="btn primary" id="billRun">开始汇总</button>
+      </div>
+      <div id="billOut"></div>
+    </section>
+
+    <!-- 未回复 -->
+    <section id="tab-unreplied" class="tab">
+      <h2>未回复邮件提醒</h2>
+      <div class="toolbar">
+        <label>时间范围 <select id="unrDays"><option>7</option><option>14</option><option selected>30</option><option>60</option></select> 天</label>
+        <button class="btn primary" id="unrRun">检查未回复</button>
+      </div>
+      <div id="unrOut"></div>
+    </section>
+
+    <!-- 搜索 -->
+    <section id="tab-search" class="tab">
+      <h2>按主题查找并总结邮件</h2>
+      <div class="toolbar wrap">
+        <input id="searchQ" class="grow" placeholder="例如：所有关于我申请材料的邮件 / 实验室报销 / 宿舍退宿">
+        <label>范围 <select id="searchDays"><option value="90">近 3 个月</option><option value="365">近 1 年</option><option value="3650" selected>全部已同步</option></select></label>
+        <label><input type="checkbox" id="searchLLM" checked> 使用大模型（关掉则只做本地关键词搜索）</label>
+        <button class="btn primary" id="searchRun">查找</button>
+      </div>
+      <div id="searchOut"></div>
+    </section>
+
+    <!-- 设置 -->
+    <section id="tab-settings" class="tab">
+      <h2>设置</h2>
+      <div class="grid2">
+        <div class="card">
+          <h3>① 邮箱（IMAP）</h3>
+          <p class="muted small">交大邮箱 IMAP：mail.sjtu.edu.cn，端口 993（SSL）。用户名一般为 jAccount 用户名，密码为 jAccount 密码。只读同步，不会改动邮件状态。</p>
+          <label>IMAP 服务器 <input id="mail_host"></label>
+          <label>端口 <input id="mail_port" type="number"></label>
+          <label>用户名 <input id="mail_username" placeholder="jAccount 用户名" autocomplete="off"></label>
+          <label>密码 <input id="mail_password" type="password" autocomplete="new-password" placeholder="留空表示不修改"></label>
+          <label>我的邮箱地址 <input id="mail_address" placeholder="xxx@sjtu.edu.cn"></label>
+          <label>同步最近多少天 <input id="sync_days" type="number"></label>
+          <label>每个文件夹最多同步 <input id="sync_max_per_folder" type="number"></label>
+          <label>额外同步的文件夹（逗号分隔） <input id="extra_folders" placeholder="默认只同步 收件箱 + 已发送"></label>
+          <div class="row"><button class="btn" id="testMail">测试邮箱连接</button></div>
+          <div id="mailTestOut" class="small"></div>
+        </div>
+
+        <div class="card">
+          <h3>② 大模型</h3>
+          <label>服务商 <select id="llm_provider"></select></label>
+          <div id="providerHint" class="hint small"></div>
+          <label>Base URL <input id="llm_base_url"></label>
+          <label>API Key <input id="llm_api_key" type="password" autocomplete="new-password" placeholder="留空则读取环境变量 / 不修改"></label>
+          <label>模型 <input id="llm_model" list="modelList"><datalist id="modelList"></datalist></label>
+          <label id="effortRow">思考力度（Claude） <select id="llm_effort"><option>low</option><option>medium</option><option>high</option></select></label>
+          <label>并发请求数 <input id="llm_concurrency" type="number" min="1" max="8"></label>
+          <div class="row">
+            <button class="btn" id="testLLM">测试模型</button>
+            <button class="btn" id="fetchModels">获取模型列表</button>
+          </div>
+          <div id="llmTestOut" class="small"></div>
+        </div>
+
+        <div class="card">
+          <h3>③ 隐私</h3>
+          <p class="muted small">分析时，邮件内容会发送到你选择的大模型服务商。想完全不出本机，可选“本地 Ollama”。</p>
+          <label class="inline"><input type="checkbox" id="privacy_redact"> 发送前遮盖手机号、身份证号、银行卡号</label>
+          <label>每封邮件最多发送的正文字数 <input id="privacy_max_body_chars" type="number"></label>
+        </div>
+
+        <div class="card">
+          <h3>④ 回信署名</h3>
+          <label>姓名 <input id="profile_name"></label>
+          <label>署名 <textarea id="profile_signature" rows="4"></textarea></label>
+        </div>
+      </div>
+      <div class="row"><button class="btn primary" id="saveCfg">保存设置</button><span id="saveOut" class="small muted"></span></div>
+    </section>
+  </main>
+</div>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-box">
+    <button class="close" id="modalClose">×</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+<div id="toast" class="toast hidden"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
