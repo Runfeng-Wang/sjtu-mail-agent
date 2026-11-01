@@ -10,9 +10,11 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import analyzers, mail_sync, store
-from .config import ROOT, load_config, public_config, save_config
-from .llm import PROVIDERS, LLMError, chat, list_models
+from . import features
+from .core import store
+from .core.config import ROOT, load_config, public_config, save_config
+from .core.llm import PROVIDERS, LLMError, chat, list_models
+from .mail import sync as mail_sync
 
 app = FastAPI(title="SJTU Mail Agent")
 WEB = ROOT / "web"
@@ -106,29 +108,29 @@ class SearchReq(BaseModel):
 
 @app.post("/api/analyze/todos")
 async def todos(req: DaysReq):
-    return await analyzers.analyze_todos(load_config(), req.days, include_bulk=req.include_bulk)
+    return await features.analyze_todos(load_config(), req.days, include_bulk=req.include_bulk)
 
 
 @app.post("/api/analyze/bills")
 async def bills(req: DaysReq):
-    return await analyzers.analyze_bills(load_config(), req.days)
+    return await features.analyze_bills(load_config(), req.days)
 
 
 @app.post("/api/analyze/unreplied")
 async def unreplied(req: DaysReq):
-    return await analyzers.analyze_unreplied(load_config(), req.days)
+    return await features.analyze_unreplied(load_config(), req.days)
 
 
 @app.post("/api/draft")
 async def draft(req: DraftReq):
-    return await analyzers.draft_reply(load_config(), req.id, req.instructions)
+    return await features.draft_reply(load_config(), req.id, req.instructions)
 
 
 @app.post("/api/search")
 async def search(req: SearchReq):
     if not req.query.strip():
         raise HTTPException(400, "请输入要查找的主题")
-    return await analyzers.search_topic(load_config(), req.query.strip(), req.days, req.use_llm)
+    return await features.search_topic(load_config(), req.query.strip(), req.days, req.use_llm)
 
 
 @app.get("/api/results/{kind}")

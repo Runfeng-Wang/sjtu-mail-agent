@@ -15,7 +15,7 @@ from email import policy
 from email.header import decode_header, make_header
 from html.parser import HTMLParser
 
-from . import store
+from ..core import store
 
 imaplib.Commands.setdefault("ID", ("NONAUTH", "AUTH", "SELECTED"))
 imaplib._MAXLINE = 10_000_000
