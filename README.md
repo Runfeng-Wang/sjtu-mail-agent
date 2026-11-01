@@ -86,14 +86,31 @@ IMAP 只读同步 ──▶ SQLite 本地缓存 ──▶ 本地规则预筛 ─
 ## 目录结构
 
 ```
-app/config.py      配置读写（密钥打码）
-app/mail_sync.py   IMAP 同步、邮件解析（中文编码、HTML 转文本、群发识别）
-app/store.py       SQLite 存储
-app/llm.py         大模型适配层（OpenAI 兼容 + Claude SDK），服务商预设
-app/analyzers.py   四项分析 + 回信草稿（提示词都在这里，可以按需修改）
-app/server.py      FastAPI 接口
-web/               前端页面（原生 HTML/JS，无需构建）
+app/
+  server.py            FastAPI 接口
+  core/
+    config.py          配置读写（密钥打码）
+    store.py           SQLite 存储
+    llm.py             大模型适配层（OpenAI 兼容 + Claude SDK），服务商预设
+  mail/
+    sync.py            IMAP 同步、邮件解析（中文编码、HTML 转文本、群发识别）
+  features/            四项分析，每项一个文件
+    common.py          共用：隐私遮盖、邮件格式化、分批调用模型、读取提示词
+    todos.py           待办事项
+    bills.py           账单 / 订阅
+    unreplied.py       未回复提醒 + 回信草稿
+    search.py          主题检索 + 总结
+  prompts/             提示词（Markdown，可直接修改）
+    todos.md  bills.md  unreplied.md  draft.md  search.md
+web/                   前端页面（原生 HTML/JS，无需构建）
 ```
+
+### 修改提示词
+
+想调整模型的分析方式，直接编辑 `app/prompts/` 里对应的 `.md` 文件，保存后下次点击“开始分析”就会生效，不用重启。注意：
+
+- 每段以单独一行的 `# 段名`（如 `# system`）开头，段名不要改。
+- `{today}`、`{me}`、`{emails}` 这类单花括号是程序填入的变量；输出格式里的 JSON 花括号要写成双花括号 `{{ }}`。
 
 ## 可以继续扩展的方向
 

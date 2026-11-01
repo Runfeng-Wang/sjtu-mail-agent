@@ -3,27 +3,13 @@ import re
 from collections import defaultdict
 
 from ..core import store
-from .common import attach_sources, make_batches, map_batches, parse_ids, require_messages, today
+from .common import attach_sources, load_prompts, make_batches, map_batches, parse_ids, require_messages, today
 
 MONEY_HINT = re.compile(
     r"(¥|￥|\$|€|£|USD|CNY|RMB|HKD|EUR|元|账单|发票|收据|订阅|续费|续订|扣款|支付|付款|缴费|金额|订单|退款|"
     r"invoice|receipt|payment|paid|charged?|subscription|renew|billing|order|refund|total|amount|trial)",
     re.I,
 )
-
-BILL_SYSTEM = """你是财务整理助手。今天是 {today}。从邮件中提取与用户相关的每一笔金钱往来：
-订阅/会员续费、购买订单、发票、学费/住宿费/会议注册费、付款提醒、退款等。
-规则：只提取邮件中明确出现的金额；同一笔交易若同时有"即将扣款提醒"和"扣款成功收据"，分别记录但 type 不同；
-营销广告里的价格不要提取；退款 amount 用负数。
-输出：
-{{"bills": [{{"source_id": 邮件ID, "vendor": "商家/机构", "item": "购买内容", "amount": 数字,
-  "currency": "CNY|USD|EUR|HKD|...", "date": "YYYY-MM-DD 交易或账单日期",
-  "type": "subscription|purchase|invoice|fee|reminder|refund",
-  "billing_cycle": "monthly|yearly|weekly|once|null", "status": "paid|due|unknown",
-  "due_date": "YYYY-MM-DD 或 null", "note": "补充说明，如试用期结束、自动续费"}}]}}
-如果这批邮件里没有任何账单，返回 {{"bills": []}}。"""
-
-BILL_USER = "请从下面的邮件中提取账单与费用：\n\n{emails}"
 
 CYCLE_MONTHS = {"monthly": 1, "yearly": 12, "weekly": 12 / 52}
 
@@ -37,8 +23,9 @@ async def analyze_bills(cfg: dict, days: int = 180) -> dict:
         result = {"bills": [], "totals": {}, "subscriptions": [], "warnings": [], "scanned": len(msgs), "candidates": 0}
         store.save_result("bills", result)
         return result
+    p = load_prompts("bills")
     batches = make_batches(cands, cfg, max_chars=2000)
-    results, warnings = await map_batches(cfg, batches, BILL_SYSTEM.format(today=today()), BILL_USER)
+    results, warnings = await map_batches(cfg, batches, p["system"].format(today=today()), p["user"])
 
     merged = {}
     for res, ids in results:

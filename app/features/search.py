@@ -4,27 +4,7 @@ from collections import defaultdict
 
 from ..core import store
 from ..core.llm import LLMError, chat_json
-from .common import brief, fmt_email, make_batches, map_batches, parse_ids, require_messages, today
-
-EXPAND_SYSTEM = """你是邮件检索助手。用户想在自己的邮箱里找某一主题的所有邮件。
-请把需求展开成用于关键词匹配的检索词：包括中英文同义词、常见邮件主题用语、相关机构/系统名、附件名常用词。
-例如"申请材料"可展开为：申请、application、推荐信、recommendation、成绩单、transcript、CV、简历、
-personal statement、SOP、语言成绩、TOEFL、IELTS、GRE、admission、offer、portal、材料、截止 等。
-输出：{{"keywords": ["10-30 个检索词，最重要的放前面"], "senders": ["可能的发件人/域名关键词，可为空"],
-  "intent": "一句话复述用户想找什么"}}"""
-
-JUDGE_SYSTEM = """你是邮件检索助手。用户要找：{intent}（原话：{query}）。
-判断下面每封邮件是否与该主题真正相关，并提炼要点。
-输出：{{"relevant": [{{"id": 邮件ID, "relevance": 0到1的数字, "key_points": "与主题相关的关键信息（一两句）"}}]}}
-只列出 relevance >= 0.5 的邮件。"""
-
-JUDGE_USER = "候选邮件：\n\n{emails}"
-
-SUMMARY_SYSTEM = """你是邮件助理。今天是 {today}。用户要了解："{query}"。
-下面是筛选出的相关邮件。请输出：
-{{"summary": "用 Markdown 写的结构化总结：整体进展、关键结论、重要日期/数字（标注来源邮件ID，如 [#12]）",
-  "timeline": [{{"date": "YYYY-MM-DD", "event": "发生了什么", "source_ids": [..]}}],
-  "open_issues": ["仍待处理或需要跟进的事项"]}}"""
+from .common import brief, fmt_email, load_prompts, make_batches, map_batches, parse_ids, require_messages, today
 
 
 def keyword_score(m: dict, keywords: list, senders: list) -> tuple:
@@ -58,6 +38,7 @@ def keyword_score(m: dict, keywords: list, senders: list) -> tuple:
 
 
 async def search_topic(cfg: dict, query: str, days: int = 3650, use_llm: bool = True, max_candidates: int = 80) -> dict:
+    p = load_prompts("search")
     msgs = store.recent_messages(days)
     require_messages(msgs)
     warnings = []
@@ -65,7 +46,7 @@ async def search_topic(cfg: dict, query: str, days: int = 3650, use_llm: bool = 
     keywords = [w for w in re.split(r"[\s,，、;；]+", query) if w]
     if use_llm:
         try:
-            ex = await chat_json(cfg, EXPAND_SYSTEM, f"用户需求：{query}")
+            ex = await chat_json(cfg, p["expand"].format(), f"用户需求：{query}")
             keywords = list(dict.fromkeys(keywords + [str(k) for k in ex.get("keywords") or []]))
             senders = [str(s) for s in ex.get("senders") or []]
             intent = ex.get("intent") or query
@@ -84,7 +65,7 @@ async def search_topic(cfg: dict, query: str, days: int = 3650, use_llm: bool = 
     relevant = []
     if use_llm and cands:
         batches = make_batches([m for _, _, m in cands], cfg, max_chars=800)
-        results, w = await map_batches(cfg, batches, JUDGE_SYSTEM.format(intent=intent, query=query), JUDGE_USER)
+        results, w = await map_batches(cfg, batches, p["judge"].format(intent=intent, query=query), p["judge_user"])
         warnings += w
         valid = {m["id"]: m for _, _, m in cands}
         for res, ids in results:
@@ -107,7 +88,7 @@ async def search_topic(cfg: dict, query: str, days: int = 3650, use_llm: bool = 
         top.sort(key=lambda m: m["ts"])
         text = "\n\n=====\n\n".join(fmt_email(m, cfg, max_chars=1500) for m in top)
         try:
-            summary = await chat_json(cfg, SUMMARY_SYSTEM.format(today=today(), query=query), text[:60000])
+            summary = await chat_json(cfg, p["summary"].format(today=today(), query=query), text[:60000])
         except LLMError as e:
             warnings.append(f"总结失败：{e}")
 

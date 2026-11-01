@@ -6,10 +6,19 @@
 import asyncio
 import re
 from datetime import datetime
+from pathlib import Path
 
 from ..core.llm import LLMError, chat_json
 
 BATCH_CHARS = 24000
+PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
+PROMPT_SECTION = re.compile(r"^# ([a-z_]+)[ \t]*$", re.M)
+
+
+def load_prompts(name: str) -> dict:
+    """读取 app/prompts/<name>.md，按“# 段名”拆成 {段名: 提示词}。每次调用都重新读，改完不用重启。"""
+    parts = PROMPT_SECTION.split((PROMPTS_DIR / f"{name}.md").read_text("utf-8"))
+    return {k: v.strip() for k, v in zip(parts[1::2], parts[2::2])}
 
 
 def today() -> str:
