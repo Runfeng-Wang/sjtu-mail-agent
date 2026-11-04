@@ -151,12 +151,13 @@ function renderTodos(r) {
   if (!r || !r.items) return "";
   let html = warnings(r.warnings);
   html += `<div class="muted small">扫描了最近 ${r.days} 天的 ${r.scanned} 封邮件${r.created_at ? " · 生成于 " + when(r.created_at) : ""}</div>`;
+  html += `<div class="cols"><div>`;
   if (r.summary) html += `<div class="card"><h3>总结</h3><div class="md">${md(r.summary)}</div></div>`;
   if (r.missed && r.missed.length) {
     html += `<div class="card alert"><h3>⚠️ 可能被遗漏的事项</h3>` +
       r.missed.map((m) => `<div class="item"><div class="title">${esc(m.title)}</div><div class="meta">${esc(m.reason)}</div><div>${sources(m.sources)}</div></div>`).join("") + "</div>";
   }
-  html += `<div class="card"><h3>全部待办（${r.items.length}）</h3>`;
+  html += `</div><div class="card"><h3>全部待办（${r.items.length}）</h3>`;
   if (!r.items.length) html += `<div class="empty">没有发现待办事项 🎉</div>`;
   html += r.items.map((t) => {
     const [sl, sc] = STATUS[t.status] || [t.status, ""];
@@ -168,7 +169,7 @@ function renderTodos(r) {
       ${t.evidence ? `<div class="meta">“${esc(t.evidence)}”</div>` : ""}
       <div>${sources(t.sources)}</div></div>`;
   }).join("");
-  return html + "</div>";
+  return html + "</div></div>";
 }
 
 $("todoRun").onclick = () => running($("todoRun"), $("todoOut"), async () => {
@@ -270,6 +271,7 @@ function renderSearch(r) {
   if (!r || !r.results) return "";
   let html = warnings(r.warnings);
   html += `<div class="muted small">“${esc(r.query)}” · 在 ${r.scanned} 封邮件中按 ${r.keywords.length} 个检索词初筛出 ${r.candidates} 封，确认相关 ${r.results.length} 封${r.created_at ? " · 生成于 " + when(r.created_at) : ""}</div>`;
+  html += `<div class="cols"><div>`;
   if (r.summary) html += `<div class="card"><h3>主题总结</h3><div class="md">${md(r.summary)}</div></div>`;
   if (r.timeline && r.timeline.length) {
     html += `<div class="card"><h3>时间线</h3><div class="timeline">` +
@@ -283,14 +285,14 @@ function renderSearch(r) {
     <div class="small">在 mail.sjtu.edu.cn 搜索框中依次搜索这些最有效的关键词：${terms.map((t) => `<code>${esc(t)}</code>`).join(" ")}
     <button class="btn small" id="cpTerms">复制</button></div>
     <div class="small muted" style="margin-top:6px">每封邮件点开后还会给出精确定位方式（文件夹、日期、Zimbra <code>msgid:</code> 搜索串、.eml 下载）。全部检索词：${r.keywords.map(esc).join("、")}</div></div>`;
-  html += `<div class="card"><h3>相关邮件（${r.results.length}）</h3>`;
+  html += `</div><div class="card"><h3>相关邮件（${r.results.length}）</h3>`;
   if (!r.results.length) html += `<div class="empty">没有找到相关邮件，可以换个说法，或扩大同步的时间范围后再试</div>`;
   html += r.results.map((m) => `<div class="item">
       <div class="title">${m.relevance != null ? `<span class="chip blue">相关度 ${Math.round(m.relevance * 100)}%</span>` : ""}<a class="src" style="font-size:14px" data-mid="${m.id}">${esc(m.subject)}</a></div>
       <div class="meta">${m.is_sent ? "我发给 " + esc(m.to) : "👤 " + esc(m.from)} · ${esc(m.date)} · ${esc(m.folder)}${m.attachments.length ? " · 📎 " + m.attachments.map(esc).join("、") : ""}</div>
       ${m.key_points ? `<div>${esc(m.key_points)}</div>` : ""}
       <div class="meta">命中：${(m.matched || []).map(esc).join("、")}</div></div>`).join("");
-  html += "</div>";
+  html += "</div></div>";
   setTimeout(() => { if ($("cpTerms")) $("cpTerms").onclick = () => copy(terms.join(" ")); });
   return html;
 }
